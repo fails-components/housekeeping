@@ -3,7 +3,7 @@ FROM node:14
 
 ARG ENV
 
-WORKDIR /usr/src/notepadhandler
+WORKDIR /usr/src/housekeeping
 
 COPY package*.json ./
 COPY .npmrc ./
