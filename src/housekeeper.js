@@ -26,6 +26,8 @@ export class Housekeeping {
     this.redis = args.redis
     this.mongo = args.mongo
 
+    this.deleteAsset = args.deleteAsset
+
     this.redlock = new Redlock([this.redis], {
       driftFactor: 0.01, // multiplied by lock ttl to determine drift time
 
@@ -46,6 +48,12 @@ export class Housekeeping {
       await this.saveChangedLectures()
       console.log('tryLectureRedisPurge')
       await this.tryLectureRedisPurge()
+      console.log('delete orphaned lectures')
+      await this.deleteOrphanedLect()
+      console.log('delete orphaned lectures done')
+      console.log('check for assets to delete')
+      await this.checkAssetsforDelete()
+      console.log('check for assets to delete done')
       console.log('House keeping done!')
       lock.unlock()
     } catch (error) {
@@ -231,7 +239,136 @@ export class Housekeeping {
     }
   }
 
-  getRoomName(uuid) {
-    return uuid
+  async deleteOrphanedLect() {
+    try {
+      const lecturescol = this.mongo.collection('lectures')
+      const boardscol = this.mongo.collection('lectureboards')
+
+      const client = this.redis
+      const sadd = promisify(this.redis.sadd).bind(client)
+
+      // first find all lectures that are orphaned, that means no course and no owner
+      const query = {
+        $and: [
+          {
+            'lms.resource_id': { $exists: false }
+          },
+          {
+            $or: [
+              { owners: { $exists: false } },
+              { owners: { $exists: true, $size: 0 } }
+            ]
+          }
+        ]
+      }
+
+      let deletedoc = await lecturescol.findOneAndDelete(query, {
+        projection: { _id: 0, usedpictures: 1, pictures: 1 }
+      })
+      const deleteprom = []
+      while (deletedoc != null) {
+        const nextdeletedoc = lecturescol.findOneAndDelete(query)
+        // do sth
+        const lectureuuid = deletedoc.uuid
+        // purge all connected boards
+        deleteprom.push(boardscol.deleteMany({ uuid: lectureuuid }))
+        // put all connected boards to a set for potential deletion
+        let pictset = []
+        if (deletedoc.usedpictures)
+          pictset = pictset.concat(deletedoc.usedpictures)
+        if (deletedoc.pictures) pictset = pictset.concat(deletedoc.pictures)
+
+        let jpg = pictset
+          .filter((el) => el.mimetype === 'image/jpeg')
+          .map((el) => el.sha.toString('hex'))
+        let png = pictset
+          .filter((el) => el.mimetype === 'image/png')
+          .map((el) => el.sha.toString('hex'))
+
+        let tjpg = pictset
+          .filter((el) => el.mimetype === 'image/jpeg')
+          .map((el) => el.tsha.toString('hex'))
+        let tpng = pictset
+          .filter((el) => el.mimetype === 'image/png')
+          .map((el) => el.tsha.toString('hex'))
+
+        jpg = [...new Set(jpg)]
+        png = [...new Set(png)]
+        tjpg = [...new Set(tjpg)]
+        tpng = [...new Set(tpng)]
+
+        if (deletedoc.backgroundpdf) {
+          const pdf = [deletedoc.backgroundpdf.sha]
+          deleteprom.push(sadd('checkdel:pdf', pdf.toString('hex')))
+        }
+
+        if (jpg.length > 0) deleteprom.push(sadd('checkdel:jpg', jpg))
+        if (png.length > 0) deleteprom.push(sadd('checkdel:png', png))
+        if (tjpg.length > 0) deleteprom.push(sadd('checkdel:jpg', tjpg))
+        if (tpng.length > 0) deleteprom.push(sadd('checkdel:png', tpng))
+        // console.log('delete doc', deletedoc)
+
+        deletedoc = await nextdeletedoc
+      }
+      await Promise.all(deleteprom) // wait that we are ready before doing other stuff
+    } catch (error) {
+      console.log('error in delete Orphaned lectures', error)
+    }
+  }
+
+  async checkAssetsforDelete() {
+    await this.checkAssetsforDeleteInt('jpg')
+    await this.checkAssetsforDeleteInt('png')
+    await this.checkAssetsforDeleteInt('pdf')
+  }
+
+  async checkAssetsforDeleteInt(fileext) {
+    const client = this.redis
+    const count = 10
+    const spop = promisify(this.redis.spop).bind(client)
+    try {
+      const lecturescol = this.mongo.collection('lectures')
+      let curset = await spop('checkdel:' + fileext, count)
+
+      while (curset.length > 0) {
+        const nextset = spop('checkdel:' + fileext, count)
+        const myprom = curset.map(async (el) => {
+          const query = {
+            $or: [
+              { 'backgroundpdf.sha': Buffer.from(el, 'hex') },
+              { 'usedpictures.sha': Buffer.from(el, 'hex') },
+              { 'pictures.sha': Buffer.from(el, 'hex') },
+              { 'usedpictures.tsha': Buffer.from(el, 'hex') },
+              { 'pictures.tsha': Buffer.from(el, 'hex') }
+            ]
+          }
+          const res = await lecturescol.findOne(query, {
+            projection: { _id: 0 }
+          })
+          if (!res) {
+            await this.deleteAssetfile(el, fileext)
+          }
+        })
+        await Promise.all(myprom) // keep the fs load low
+
+        curset = await nextset
+      }
+    } catch (error) {
+      console.log('problem in checkassetsfordelete', error)
+    }
+  }
+
+  deleteAssetfile(shastr, fileext) {
+    console.log('Delete asset with sha and fileext ', shastr, fileext)
+    try {
+      this.deleteAsset(shastr, fileext)
+    } catch (error) {
+      console.log(
+        'Problem delete asset with sha and fileext ',
+        shastr,
+        fileext,
+        error
+      )
+    }
   }
 }

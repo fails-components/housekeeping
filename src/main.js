@@ -22,6 +22,7 @@ import MongoClient from 'mongodb'
 import { Housekeeping } from './housekeeper.js'
 
 import { FailsConfig } from '@fails-components/config'
+import { FailsAssets } from '@fails-components/security'
 import { CronJob } from 'cron'
 
 const initApp = async () => {
@@ -36,9 +37,17 @@ const initApp = async () => {
   })
   const mongodb = mongoclient.db(cfg.getMongoDB())
 
+  const assets = new FailsAssets({
+    datadir: cfg.getDataDir(),
+    dataurl: cfg.getURL('data'),
+    webservertype: cfg.getWSType(),
+    privateKey: cfg.getStatSecret()
+  })
+
   const hk = new Housekeeping({
     redis: redisclient,
-    mongo: mongodb
+    mongo: mongodb,
+    deleteAsset: assets.shadeletelocal
   })
 
   // eslint-disable-next-line no-unused-vars
