@@ -1,0 +1,56 @@
+/*
+    Fails Components (Fancy Automated Internet Lecture System - Components)
+    Copyright (C)  2015-2017 (original FAILS), 
+                   2021- (FAILS Components)  Marten Richter <marten.richter@freenet.de>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+import * as redis from 'redis'
+import MongoClient from 'mongodb'
+import { Housekeeping } from './housekeeper.js'
+
+import { FailsConfig } from '@fails-components/config'
+import { CronJob } from 'cron'
+
+const initApp = async () => {
+  const cfg = new FailsConfig()
+  const redisclient = redis.createClient(cfg.redisPort(), cfg.redisHost(), {
+    detect_buffers: true /* required by notescreen connection */
+  })
+
+  const mongoclient = await MongoClient.connect(cfg.getMongoURL(), {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  const mongodb = mongoclient.db(cfg.getMongoDB())
+
+  const hk = new Housekeeping({
+    redis: redisclient,
+    mongo: mongodb
+  })
+
+  // eslint-disable-next-line no-unused-vars
+  const hkjob = new CronJob(
+    '35 * * * * *',
+    () => {
+      console.log('Start house keeping')
+      hk.houseKeeping()
+      console.log('End house keeping')
+    },
+    null,
+    true
+  ) // run it every minute
+}
+initApp()
