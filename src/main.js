@@ -50,12 +50,18 @@ const initApp = async () => {
     deleteAsset: assets.shadeletelocal
   })
 
+  let hklocktime = 0
   // eslint-disable-next-line no-unused-vars
   const hkjob = new CronJob(
     '35 * * * * *',
     () => {
       console.log('Start house keeping')
-      hk.houseKeeping()
+      if (Date.now() - hklocktime > 1000 * 40) {
+        hklocktime = Date.now()
+        hk.houseKeeping()
+      } else {
+        console.log('housekeeping blocked')
+      }
       console.log('End house keeping')
     },
     null,
