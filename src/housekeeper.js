@@ -44,17 +44,21 @@ export class Housekeeping {
     let lock
     try {
       lock = await this.redlock.lock('housekeeping', 2000)
-      console.log('Do saveChangedLectures')
+      console.log('Do saveChangedLectures ' + new Date().toLocaleString())
       await this.saveChangedLectures()
-      console.log('tryLectureRedisPurge')
+      console.log('tryLectureRedisPurge ' + new Date().toLocaleString())
       await this.tryLectureRedisPurge()
-      console.log('delete orphaned lectures')
+      console.log('delete orphaned lectures ' + new Date().toLocaleString())
       await this.deleteOrphanedLect()
-      console.log('delete orphaned lectures done')
-      console.log('check for assets to delete')
+      console.log(
+        'delete orphaned lectures done ' + new Date().toLocaleString()
+      )
+      console.log('check for assets to delete ' + new Date().toLocaleString())
       await this.checkAssetsforDelete()
-      console.log('check for assets to delete done')
-      console.log('House keeping done!')
+      console.log(
+        'check for assets to delete done ' + new Date().toLocaleString()
+      )
+      console.log('House keeping done! ' + new Date().toLocaleString())
       lock.unlock()
     } catch (error) {
       console.log('Busy or Error in Housekeeping', error)
@@ -262,9 +266,11 @@ export class Housekeeping {
         ]
       }
 
-      let deletedoc = await lecturescol.findOneAndDelete(query, {
-        projection: { _id: 0, usedpictures: 1, pictures: 1 }
-      })
+      let deletedoc = (
+        await lecturescol.findOneAndDelete(query, {
+          projection: { _id: 0, usedpictures: 1, pictures: 1 }
+        })
+      ).value
       const deleteprom = []
       while (deletedoc != null) {
         const nextdeletedoc = lecturescol.findOneAndDelete(query)
@@ -308,7 +314,7 @@ export class Housekeeping {
         if (tpng.length > 0) deleteprom.push(sadd('checkdel:png', tpng))
         // console.log('delete doc', deletedoc)
 
-        deletedoc = await nextdeletedoc
+        deletedoc = (await nextdeletedoc).value
       }
       await Promise.all(deleteprom) // wait that we are ready before doing other stuff
     } catch (error) {
