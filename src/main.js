@@ -28,7 +28,8 @@ import { CronJob } from 'cron'
 const initApp = async () => {
   const cfg = new FailsConfig()
   const redisclient = redis.createClient(cfg.redisPort(), cfg.redisHost(), {
-    detect_buffers: true /* required by notescreen connection */
+    detect_buffers: true /* required by notescreen connection */,
+    password: cfg.redisPass()
   })
 
   const mongoclient = await MongoClient.connect(cfg.getMongoURL(), {

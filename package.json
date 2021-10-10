@@ -1,6 +1,6 @@
 {
   "name": "@fails-components/housekeeping",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Supplies database housekeeping",
   "author": "Marten Richter",
   "license": "AGPL-3.0-or-later",
@@ -43,7 +43,7 @@
     "dist"
   ],
   "dependencies": {
-    "@fails-components/config": "0.0.3",
+    "@fails-components/config": ">=0.0.5",
     "@fails-components/security": "0.0.3",
     "cron": "^1.8.2",
     "jsonwebtoken": "^8.5.1",
