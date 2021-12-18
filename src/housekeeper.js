@@ -38,6 +38,56 @@ export class Housekeeping {
     })
 
     // this.lastaccess = this.lastaccess.bind(this)
+
+    this.createMongoIndices()
+  }
+
+  async createMongoIndices() {
+    // note: if an indices changes, that was release, it will be delete here and recreated
+
+    // create indices,
+    try {
+      const lecturescol = this.mongo.collection('lectures')
+
+      // first lectures
+      // first one the unique identifier
+      const uuidres = await lecturescol.createIndex(
+        { uuid: 1 },
+        { unique: true }
+      ) // this one is unique
+      console.log('lectures unique uuid index create', uuidres)
+
+      const lmsres = await lecturescol.createIndex({
+        'lms.iss': 1,
+        'lms.resource_id': 1
+      })
+      console.log('lectures lms index create', lmsres)
+
+      const ownersres = await lecturescol.createIndex({ owners: 1 })
+      console.log('lectures owners index create', ownersres)
+
+      // second boards
+      const boardscol = this.mongo.collection('lectureboards')
+      const buuidres = await boardscol.createIndex({ uuid: 1, board: 1 }) // this one is not unique, currently board is not needed but may be useful in the future
+      console.log('boards uuid and board name index create', buuidres)
+
+      const userscol = this.mongo.collection('users')
+      const uuuidres = await userscol.createIndex({ uuid: 1 }, { unique: true }) // this one is unique
+      console.log('users unique uuid index create', uuuidres)
+      const usernameres = await userscol.createIndex(
+        { 'lms.username': 1 },
+        { unique: true }
+      ) // this one is unique
+      console.log('users unique username index create', usernameres)
+
+      const emailres = await userscol.createIndex(
+        { email: 1 },
+        { unique: true }
+      ) // this one is unique
+      console.log('users unique email index create', emailres)
+    } catch (error) {
+      console.log('problem with mongodb index creation')
+    }
   }
 
   async houseKeeping() {
