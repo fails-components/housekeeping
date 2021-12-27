@@ -12,7 +12,7 @@
   "source": "src/main.js",
   "type": "module",
   "engines": {
-    "node": ">=14"
+    "node": ">=16"
   },
   "scripts": {
     "start": "node src/main.js",
@@ -42,8 +42,8 @@
     "dist"
   ],
   "dependencies": {
-    "@fails-components/config": "^1.0.0-rc.1",
-    "@fails-components/security": "^1.0.0-rc.4",
+    "@fails-components/config": "^1.0.0-rc.3",
+    "@fails-components/security": "^1.0.0-rc.6",
     "cron": "^1.8.2",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.7.1",
