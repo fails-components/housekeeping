@@ -18,8 +18,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { promisify } from 'util'
 import Redlock from 'redlock'
+import { RedisRedlockProxy } from '@fails-components/security'
+import { commandOptions } from 'redis'
 
 export class Housekeeping {
   constructor(args) {
@@ -28,7 +29,7 @@ export class Housekeeping {
 
     this.deleteAsset = args.deleteAsset
 
-    this.redlock = new Redlock([this.redis], {
+    this.redlock = new Redlock([RedisRedlockProxy(this.redis)], {
       driftFactor: 0.01, // multiplied by lock ttl to determine drift time
 
       retryCount: 10,
@@ -116,24 +117,17 @@ export class Housekeeping {
   }
 
   async saveChangedLectures() {
-    const client = this.redis
-    const scan = promisify(this.redis.scan).bind(client)
-    const hmget = promisify(this.redis.hmget).bind(client)
     try {
       let cursor = 0
       do {
-        const scanret = await scan(
-          cursor,
-          'MATCH',
-          'lecture:????????-????-????-????-????????????',
-          'COUNT',
-          20
-        )
-        // console.log("scanret", scanret);
+        const scanret = await this.redis.scan(cursor, {
+          MATCH: 'lecture:????????-????-????-????-????????????',
+          COUNT: 20
+        })
         // got the lectures now figure out, which we need to save
         const saveproms = Promise.all(
-          scanret[1].map(async (el) => {
-            const info = await hmget(el, 'lastwrite', 'lastDBsave')
+          scanret.keys.map(async (el) => {
+            const info = await this.redis.hmGet(el, ['lastwrite', 'lastDBsave'])
             // console.log("our info",info);
             if (info[0] > info[1] + 3 * 60 * 1000) {
               // do not save more often than every 3 minutes
@@ -144,7 +138,7 @@ export class Housekeeping {
         )
         await saveproms // wait before next iteration, do not use up to much mem
 
-        cursor = scanret[0]
+        cursor = scanret.cursor
       } while (cursor !== '0')
     } catch (error) {
       console.log('Error saveChangedLecture', error)
@@ -152,11 +146,6 @@ export class Housekeeping {
   }
 
   async saveLectureToDB(lectureuuid) {
-    const client = this.redis
-    const smembers = promisify(this.redis.smembers).bind(client)
-    const get = promisify(this.redis.get).bind(client)
-    const hset = promisify(this.redis.hset).bind(client)
-    const hget = promisify(this.redis.hget).bind(client)
     const time = Date.now()
     console.log('Try saveLectureToDB  for lecture', lectureuuid)
     try {
@@ -166,16 +155,29 @@ export class Housekeeping {
 
       const boardprefix = 'lecture:' + lectureuuid + ':board'
       let update = []
-      const backgroundp = hget('lecture:' + lectureuuid, 'backgroundbw')
+      const backgroundp = this.redis.hGet(
+        'lecture:' + lectureuuid,
+        'backgroundbw'
+      )
 
-      const members = await smembers(boardprefix + 's')
+      const members = await this.redis.sMembers(boardprefix + 's')
       const copyprom = Promise.all(
         members.map(async (el) => {
           const boardname = el
           // if (boardname=="s") return null; // "boards excluded"
           // console.log("one board", el);
           // console.log("boardname", boardname);
-          const boarddata = await get(Buffer.from(boardprefix + el))
+          let boarddata
+          if (this.redis.getBuffer)
+            // required for v 4.0.0, remove later
+            boarddata = await this.redis.getBuffer(boardprefix + el)
+          // future api
+          else
+            boarddata = await this.redis.get(
+              commandOptions({ returnBuffers: true }),
+              boardprefix + el
+            )
+
           if (boarddata) {
             // got it now store it
             update = boardscol.updateOne(
@@ -209,7 +211,10 @@ export class Housekeeping {
           }
         }
       )
-      await hset('lecture:' + lectureuuid, 'lastDBsave', Date.now())
+      await this.redis.hSet('lecture:' + lectureuuid, [
+        'lastDBsave',
+        Date.now().toString()
+      ])
       console.log('saveLectureToDB successful for lecture', lectureuuid)
     } catch (err) {
       console.log('saveLectToDBErr', err, lectureuuid)
@@ -217,18 +222,12 @@ export class Housekeeping {
   }
 
   async tryLectureRedisPurge() {
-    const client = this.redis
-    // ok we got through all lectures and collect last access times
-    const scan = promisify(this.redis.scan).bind(client)
-    const hmget = promisify(this.redis.hmget).bind(client)
-    const unlink = promisify(this.redis.unlink).bind(client)
-
     try {
       let cursor = 0
       const allprom = []
 
       do {
-        const scanret = await scan(
+        const scanret = await this.redis.scan(
           cursor,
           'MATCH',
           'lecture:????????-????-????-????-????????????',
@@ -238,27 +237,25 @@ export class Housekeeping {
         // ok we figure out one by one if we should delete
         // console.log("purge scanret", scanret);
         const myprom = Promise.all(
-          scanret[1].map(async (el) => {
+          scanret.keys.map(async (el) => {
             const lastaccessesp = []
 
-            lastaccessesp.push(hmget(el, 'lastwrite', 'lastaccess'))
+            lastaccessesp.push(this.redis.hmGet(el, 'lastwrite', 'lastaccess'))
 
             // ok but also the notescreens are of interest
 
             let cursor2 = 0
             do {
-              const scanret2 = await scan(
-                cursor2,
-                'MATCH',
-                el + ':notescreen:????????-????-????-????-????????????'
-              )
+              const scanret2 = await this.redis.scan(cursor2, {
+                MATCH: el + ':notescreen:????????-????-????-????-????????????'
+              })
               // console.log("purge scanret2", scanret2);
-              const myprom2 = scanret2[1].map((el2) => {
-                return hmget(el2, 'lastaccess')
+              const myprom2 = scanret2.keys.map((el2) => {
+                return this.redis.hmGet(el2, 'lastaccess')
               })
               lastaccessesp.push(...myprom2)
 
-              cursor2 = scanret2[0]
+              cursor2 = scanret2.cursor
             } while (cursor2 !== '0')
 
             let laarr = await Promise.all(lastaccessesp)
@@ -271,20 +268,24 @@ export class Housekeeping {
             if (Date.now() - la > 30 * 60 * 1000) {
               console.log('Starting to purge lecture ', el)
               // purge allowed
-              retprom.push(unlink(el))
+              retprom.push(this.redis.unlink(el))
               let pcursor = 0
               do {
-                const pscanret = await scan(pcursor, 'MATCH', el + ':*')
+                const pscanret = await this.redis.scan(pcursor, {
+                  MATCH: el + ':*'
+                })
                 console.log('purge element', pscanret)
-                pcursor = pscanret[0]
-                retprom.push(...pscanret[1].map((el2) => unlink(el2)))
+                pcursor = pscanret.cursor
+                retprom.push(
+                  ...pscanret.keys.map((el2) => this.redis.unlink(el2), this)
+                )
               } while (pcursor !== '0')
             }
             return Promise.all(retprom)
-          })
+          }, this)
         )
         allprom.push(myprom)
-        cursor = scanret[0]
+        cursor = scanret.cursor
       } while (cursor !== '0')
       await Promise.all(allprom) // we are finished giving orders, wait for return
       return
@@ -297,9 +298,6 @@ export class Housekeeping {
     try {
       const lecturescol = this.mongo.collection('lectures')
       const boardscol = this.mongo.collection('lectureboards')
-
-      const client = this.redis
-      const sadd = promisify(this.redis.sadd).bind(client)
 
       // first find all lectures that are orphaned, that means no course and no owner
       const query = {
@@ -355,13 +353,17 @@ export class Housekeeping {
 
         if (deletedoc.backgroundpdf) {
           const pdf = [deletedoc.backgroundpdf.sha]
-          deleteprom.push(sadd('checkdel:pdf', pdf.toString('hex')))
+          deleteprom.push(this.redis.sAdd('checkdel:pdf', pdf.toString('hex')))
         }
 
-        if (jpg.length > 0) deleteprom.push(sadd('checkdel:jpg', jpg))
-        if (png.length > 0) deleteprom.push(sadd('checkdel:png', png))
-        if (tjpg.length > 0) deleteprom.push(sadd('checkdel:jpg', tjpg))
-        if (tpng.length > 0) deleteprom.push(sadd('checkdel:png', tpng))
+        if (jpg.length > 0)
+          deleteprom.push(this.redis.sAdd('checkdel:jpg', jpg))
+        if (png.length > 0)
+          deleteprom.push(this.redis.sAdd('checkdel:png', png))
+        if (tjpg.length > 0)
+          deleteprom.push(this.redis.sAdd('checkdel:jpg', tjpg))
+        if (tpng.length > 0)
+          deleteprom.push(this.redis.sAdd('checkdel:png', tpng))
         // console.log('delete doc', deletedoc)
 
         deletedoc = (await nextdeletedoc).value
@@ -379,15 +381,13 @@ export class Housekeeping {
   }
 
   async checkAssetsforDeleteInt(fileext) {
-    const client = this.redis
     const count = 10
-    const spop = promisify(this.redis.spop).bind(client)
     try {
       const lecturescol = this.mongo.collection('lectures')
-      let curset = await spop('checkdel:' + fileext, count)
+      let curset = await this.redis.sPop('checkdel:' + fileext, count)
 
       while (curset.length > 0) {
-        const nextset = spop('checkdel:' + fileext, count)
+        const nextset = this.redis.sPop('checkdel:' + fileext, count)
         const myprom = curset.map(async (el) => {
           const query = {
             $or: [
@@ -404,7 +404,7 @@ export class Housekeeping {
           if (!res) {
             await this.deleteAssetfile(el, fileext)
           }
-        })
+        }, this)
         await Promise.all(myprom) // keep the fs load low
 
         curset = await nextset
