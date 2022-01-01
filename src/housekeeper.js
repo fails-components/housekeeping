@@ -270,6 +270,7 @@ export class Housekeeping {
               console.log('Starting to purge lecture ', el)
               // purge allowed
               retprom.push(this.redis.unlink(el))
+              retprom.push(this.redis.sRem('lectures', el))
               let pcursor = 0
               do {
                 const pscanret = await this.redis.scan(pcursor, {
