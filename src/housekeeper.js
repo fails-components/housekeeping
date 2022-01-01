@@ -128,8 +128,7 @@ export class Housekeeping {
         const saveproms = Promise.all(
           scanret.keys.map(async (el) => {
             const info = await this.redis.hmGet(el, ['lastwrite', 'lastDBsave'])
-            // console.log("our info",info);
-            if (info[0] > info[1] + 3 * 60 * 1000) {
+            if (Number(info[0]) > Number(info[1]) + 3 * 60 * 1000) {
               // do not save more often than every 3 minutes
               const lectureuuid = el.substr(8)
               return this.saveLectureToDB(lectureuuid)
@@ -139,7 +138,7 @@ export class Housekeeping {
         await saveproms // wait before next iteration, do not use up to much mem
 
         cursor = scanret.cursor
-      } while (cursor !== '0')
+      } while (cursor !== 0)
     } catch (error) {
       console.log('Error saveChangedLecture', error)
     }
@@ -227,15 +226,12 @@ export class Housekeeping {
       const allprom = []
 
       do {
-        const scanret = await this.redis.scan(
-          cursor,
-          'MATCH',
-          'lecture:????????-????-????-????-????????????',
-          'COUNT',
-          40
-        )
+        const scanret = await this.redis.scan(cursor, {
+          MATCH: 'lecture:????????-????-????-????-????????????',
+          COUNT: 40
+        })
         // ok we figure out one by one if we should delete
-        // console.log("purge scanret", scanret);
+        // console.log('purge scanret', scanret)
         const myprom = Promise.all(
           scanret.keys.map(async (el) => {
             const lastaccessesp = []
@@ -249,14 +245,14 @@ export class Housekeeping {
               const scanret2 = await this.redis.scan(cursor2, {
                 MATCH: el + ':notescreen:????????-????-????-????-????????????'
               })
-              // console.log("purge scanret2", scanret2);
+              // console.log('purge scanret2', scanret2)
               const myprom2 = scanret2.keys.map((el2) => {
                 return this.redis.hmGet(el2, 'lastaccess')
               })
               lastaccessesp.push(...myprom2)
 
               cursor2 = scanret2.cursor
-            } while (cursor2 !== '0')
+            } while (cursor2 !== 0)
 
             let laarr = await Promise.all(lastaccessesp)
             laarr = laarr.flat()
@@ -265,7 +261,7 @@ export class Housekeeping {
             // console.log("lastaccess",la,Date.now()-la );
             const retprom = []
             // console.log("before purge");
-            if (Date.now() - la > 30 * 60 * 1000) {
+            if (Date.now() - Number(la) > 30 * 60 * 1000) {
               console.log('Starting to purge lecture ', el)
               // purge allowed
               retprom.push(this.redis.unlink(el))
@@ -279,14 +275,14 @@ export class Housekeeping {
                 retprom.push(
                   ...pscanret.keys.map((el2) => this.redis.unlink(el2), this)
                 )
-              } while (pcursor !== '0')
+              } while (pcursor !== 0)
             }
             return Promise.all(retprom)
           }, this)
         )
         allprom.push(myprom)
         cursor = scanret.cursor
-      } while (cursor !== '0')
+      } while (cursor !== 0)
       await Promise.all(allprom) // we are finished giving orders, wait for return
       return
     } catch (err) {
