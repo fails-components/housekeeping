@@ -167,19 +167,19 @@ export class Housekeeping {
       const members = await this.redis.sMembers(boardprefix + 's')
       const copyprom = Promise.all(
         members.map(async (el) => {
-          const boardname = el
+          const boardname = el ? el.toString() : null
           // if (boardname=="s") return null; // "boards excluded"
           // console.log("one board", el);
           // console.log("boardname", boardname);
           let boarddata
           if (this.redis.getBuffer)
             // required for v 4.0.0, remove later
-            boarddata = await this.redis.getBuffer(boardprefix + el)
+            boarddata = await this.redis.getBuffer(boardprefix + boardname)
           // future api
           else
             boarddata = await this.redis.get(
               commandOptions({ returnBuffers: true }),
-              boardprefix + el
+              boardprefix + boardname
             )
 
           if (boarddata) {
