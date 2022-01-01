@@ -128,8 +128,13 @@ export class Housekeeping {
         const saveproms = Promise.all(
           scanret.keys.map(async (el) => {
             const info = await this.redis.hmGet(el, ['lastwrite', 'lastDBsave'])
-            if (Number(info[0]) > Number(info[1]) + 3 * 60 * 1000) {
+            if (
+              Number(info[0]) > Number(info[1]) + 3 * 60 * 1000 ||
+              (Date.now() > Number(info[1]) + 5 * 60 * 1000 &&
+                Number(info[0]) > Number(info[1]))
+            ) {
               // do not save more often than every 3 minutes
+              // or you have waited for five minutes
               const lectureuuid = el.substr(8)
               return this.saveLectureToDB(lectureuuid)
             } else return null
