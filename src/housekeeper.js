@@ -260,7 +260,7 @@ export class Housekeeping {
             } while (cursor2 !== 0)
 
             let laarr = await Promise.all(lastaccessesp)
-            laarr = laarr.flat()
+            laarr = laarr.flat().map((el) => Number(el))
             // console.log("laar",laarr);
             const la = Math.max(...laarr)
             // console.log("lastaccess",la,Date.now()-la );
