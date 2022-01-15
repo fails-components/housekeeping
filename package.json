@@ -42,8 +42,8 @@
     "dist"
   ],
   "dependencies": {
-    "@fails-components/config": "^1.0.0-rc.3",
-    "@fails-components/security": "^1.0.0-rc.11",
+    "@fails-components/config": "^1.0.0",
+    "@fails-components/security": "^1.0.0",
     "cron": "^1.8.2",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.7.1",
