@@ -1,6 +1,6 @@
 {
   "name": "@fails-components/housekeeping",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Supplies database housekeeping",
   "author": "Marten Richter",
   "license": "AGPL-3.0-or-later",
