@@ -43,7 +43,7 @@
   ],
   "dependencies": {
     "@fails-components/config": "^1.0.1",
-    "@fails-components/security": "^1.0.1",
+    "@fails-components/security": "^1.0.2",
     "cron": "^1.8.2",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.7.1",
