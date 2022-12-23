@@ -28,6 +28,7 @@ export class Housekeeping {
     this.mongo = args.mongo
 
     this.deleteAsset = args.deleteAsset
+    this.setupAssets = args.setupAssets
 
     this.redlock = new Redlock([RedisRedlockProxy(this.redis)], {
       driftFactor: 0.01, // multiplied by lock ttl to determine drift time
@@ -40,7 +41,12 @@ export class Housekeeping {
 
     // this.lastaccess = this.lastaccess.bind(this)
 
-    this.createMongoIndices()
+    this.createMongoIndices().catch((error) => {
+      console.log('problem creatung mongo indices', error)
+    })
+    this.setupAssets().catch((error) => {
+      console.log('problem settign up assests', error)
+    })
   }
 
   async createMongoIndices() {

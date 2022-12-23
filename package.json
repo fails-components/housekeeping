@@ -42,10 +42,9 @@
     "dist"
   ],
   "dependencies": {
-    "@fails-components/config": "^1.0.1",
-    "@fails-components/security": "^1.0.2",
+    "@fails-components/config": "^1.1.0",
+    "@fails-components/security": "^1.1.0",
     "cron": "^1.8.2",
-    "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.7.1",
     "performance-now": "^2.1.0",
     "redis": "^4.0.6",

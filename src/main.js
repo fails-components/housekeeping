@@ -45,13 +45,16 @@ const initApp = async () => {
     datadir: cfg.getDataDir(),
     dataurl: cfg.getURL('data'),
     webservertype: cfg.getWSType(),
-    privateKey: cfg.getStatSecret()
+    savefile: cfg.getStatSaveType(),
+    privateKey: cfg.getStatSecret(),
+    swift: cfg.getSwift()
   })
 
   const hk = new Housekeeping({
     redis: redisclient,
     mongo: mongodb,
-    deleteAsset: assets.shadeletelocal
+    deleteAsset: assets.shadelete,
+    setupAssets: assets.setupAssets
   })
 
   let hklocktime = 0
