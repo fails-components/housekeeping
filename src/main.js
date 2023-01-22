@@ -63,7 +63,8 @@ const initApp = async () => {
     webservertype: cfg.getWSType(),
     savefile: cfg.getStatSaveType(),
     privateKey: cfg.getStatSecret(),
-    swift: cfg.getSwift()
+    swift: cfg.getSwift(),
+    s3: cfg.getS3()
   })
 
   const hk = new Housekeeping({
