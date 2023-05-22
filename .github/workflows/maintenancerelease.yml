@@ -20,4 +20,5 @@ jobs:
       - run: git config --global user.name 'Fails maintenance bot'
       - run: git config --global user.email 'marten.richter@freenet.de'
       - run: npm version patch
+      - run: git push --tags
       - run: git push
