@@ -20,19 +20,35 @@
 import * as redis from 'redis'
 import MongoClient from 'mongodb'
 import { Housekeeping } from './housekeeper.js'
-
+import { writeFile, rm } from 'node:fs/promises'
 import { FailsConfig } from '@fails-components/config'
 import { FailsAssets } from '@fails-components/security'
 import { CronJob } from 'cron'
 
 const initApp = async () => {
   const cfg = new FailsConfig()
-  const redisclient = redis.createClient({
-    socket: { port: cfg.redisPort(), host: cfg.redisHost() },
-    password: cfg.redisPass()
-  })
+  let rediscl
+  let redisclusterconfig
+  if (cfg.getRedisClusterConfig)
+    redisclusterconfig = cfg.getRedisClusterConfig()
+  if (!redisclusterconfig) {
+    console.log(
+      'Connect to redis database with host:',
+      cfg.redisHost(),
+      'and port:',
+      cfg.redisPort()
+    )
+    rediscl = redis.createClient({
+      socket: { port: cfg.redisPort(), host: cfg.redisHost() },
+      password: cfg.redisPass()
+    })
+  } else {
+    // cluster case
+    console.log('Connect to redis cluster with config:', redisclusterconfig)
+    rediscl = redis.createCluster(redisclusterconfig)
+  }
 
-  await redisclient.connect()
+  await rediscl.connect()
   console.log('redisclient connected')
 
   const mongoclient = await MongoClient.connect(cfg.getMongoURL(), {
@@ -45,13 +61,17 @@ const initApp = async () => {
     datadir: cfg.getDataDir(),
     dataurl: cfg.getURL('data'),
     webservertype: cfg.getWSType(),
-    privateKey: cfg.getStatSecret()
+    savefile: cfg.getStatSaveType(),
+    privateKey: cfg.getStatSecret(),
+    swift: cfg.getSwift(),
+    s3: cfg.getS3()
   })
 
   const hk = new Housekeeping({
-    redis: redisclient,
+    redis: rediscl,
     mongo: mongodb,
-    deleteAsset: assets.shadeletelocal
+    deleteAsset: assets.shadelete,
+    setupAssets: assets.setupAssets
   })
 
   let hklocktime = 0
@@ -62,9 +82,20 @@ const initApp = async () => {
       console.log('Start house keeping')
       if (Date.now() - hklocktime > 1000 * 40) {
         hklocktime = Date.now()
-        hk.houseKeeping()
+        writeFile('/tmp/healthy.txt', 'ok').catch((error) => {
+          console.log('Writing health file failed.', error)
+        })
+        hk.houseKeeping().catch((error) => {
+          console.log('Problem with housekeeping:', error)
+          rm('/tmp/healthy.txt').catch((error) => {
+            console.log('Removing health file failed.', error)
+          })
+        })
       } else {
         console.log('housekeeping blocked')
+        rm('/tmp/healthy.txt').catch((error) => {
+          console.log('Removing health file failed.', error)
+        })
       }
       console.log('End house keeping')
     },

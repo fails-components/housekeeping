@@ -1,6 +1,6 @@
 {
   "name": "@fails-components/housekeeping",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Supplies database housekeeping",
   "author": "Marten Richter",
   "license": "AGPL-3.0-or-later",
@@ -12,7 +12,7 @@
   "source": "src/main.js",
   "type": "module",
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "scripts": {
     "start": "node src/main.js",
@@ -33,8 +33,7 @@
     "eslint-plugin-prettier": "^3.4.1",
     "eslint-plugin-promise": "^4.3.1",
     "eslint-plugin-standard": "^4.1.0",
-    "gh-pages": "^3.1.0",
-    "nodemon": "^2.0.13",
+    "nodemon": "^2.0.20",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.4.1"
   },
@@ -42,12 +41,10 @@
     "dist"
   ],
   "dependencies": {
-    "@fails-components/config": "^1.0.1",
-    "@fails-components/security": "^1.0.2",
+    "@fails-components/config": "^1.2.0",
+    "@fails-components/security": "^1.3.2",
     "cron": "^1.8.2",
-    "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.7.1",
-    "performance-now": "^2.1.0",
     "redis": "^4.0.6",
     "redlock": "^4.2.0"
   },
