@@ -92,8 +92,52 @@ export class Housekeeping {
         { unique: true }
       ) // this one is unique
       console.log('users unique email index create', emailres)
+
+      const avsroutercol = this.mongo.collection('avsrouters')
+
+      const expres = await avsroutercol.createIndex(
+        { changedAt: 1 },
+        { expireAfterSeconds: 45 }
+      )
+      console.log('avsrouter expire index create', expres)
+      const urlres = await avsroutercol.createIndex(
+        { url: 1 },
+        { unique: true }
+      ) // this one is unique
+      console.log('avsrouter unique url index create', urlres)
+
+      const clientres = await avsroutercol.createIndex({ clients: 1 }) // this one is unique
+      console.log('avsrouter client index create', clientres)
+
+      const primaryRealmsRes = await avsroutercol.createIndex({
+        region: 1,
+        primaryRealms: 1
+      }) // this one is unique
+      console.log('avsrouter primaryRealm index create', primaryRealmsRes)
+
+      const localPrimaryRealmsRes = await avsroutercol.createIndex({
+        region: 1,
+        localPrimaryRealms: 1
+      }) // this one is unique
+      console.log(
+        'avsrouter localPrimaryRealm index create',
+        localPrimaryRealmsRes
+      )
+
+      const avsregioncol = this.mongo.collection('avsregion')
+
+      const expregres = await avsregioncol.createIndex(
+        { changedAt: 1 },
+        { expireAfterSeconds: 60 * 60 * 24 }
+      )
+      console.log('avsregion expire index create', expregres)
+      const regnameres = await avsregioncol.createIndex(
+        { name: 1 },
+        { unique: true }
+      ) // this one is unique
+      console.log('avsregion unique name index create', regnameres)
     } catch (error) {
-      console.log('problem with mongodb index creation')
+      console.log('problem with mongodb index creation', error)
     }
   }
 

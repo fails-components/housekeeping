@@ -1,6 +1,6 @@
 {
   "name": "@fails-components/housekeeping",
-  "version": "1.1.1",
+  "version": "1.2.2",
   "description": "Supplies database housekeeping",
   "author": "Marten Richter",
   "license": "AGPL-3.0-or-later",
@@ -12,11 +12,10 @@
   "source": "src/main.js",
   "type": "module",
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "scripts": {
     "start": "node src/main.js",
-    "dev": "nodemon -r dotenv/config src/main.js",
     "test": "run-s test:lint",
     "test:lint": "eslint ."
   },
@@ -24,7 +23,6 @@
     "babel-eslint": "^10.0.3",
     "classnames": "^2.2.6",
     "cross-env": "^7.0.3",
-    "dotenv": "^10.0.0",
     "eslint": "^7.20.0",
     "eslint-config-prettier": "^7.2.0",
     "eslint-config-standard": "^16.0.2",
@@ -33,7 +31,6 @@
     "eslint-plugin-prettier": "^3.4.1",
     "eslint-plugin-promise": "^4.3.1",
     "eslint-plugin-standard": "^4.1.0",
-    "nodemon": "^2.0.20",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.4.1"
   },
