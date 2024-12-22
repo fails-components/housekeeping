@@ -404,8 +404,8 @@ export class Housekeeping {
         tpng = [...new Set(tpng)]
 
         if (deletedoc.backgroundpdf) {
-          const pdf = [deletedoc.backgroundpdf.sha]
-          deleteprom.push(this.redis.sAdd('checkdel:pdf', pdf.toString('hex')))
+          const pdf = [deletedoc.backgroundpdf.sha.toString('hex')]
+          deleteprom.push(this.redis.sAdd('checkdel:pdf', pdf))
         }
 
         if (jpg.length > 0)
