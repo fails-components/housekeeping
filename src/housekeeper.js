@@ -50,7 +50,7 @@ export class Housekeeping {
   }
 
   async createMongoIndices() {
-    // note: if an indices changes, that was release, it will be delete here and recreated
+    // note: if an indices changes, that was released, it will be delete here and recreated
 
     // create indices,
     try {
@@ -368,7 +368,7 @@ export class Housekeeping {
 
       let deletedoc = (
         await lecturescol.findOneAndDelete(query, {
-          projection: { _id: 0, usedpictures: 1, pictures: 1 }
+          projection: { _id: 0, usedpictures: 1, pictures: 1, backgroundpdf: 1 }
         })
       ).value
       const deleteprom = []
