@@ -368,7 +368,14 @@ export class Housekeeping {
 
       let deletedoc = (
         await lecturescol.findOneAndDelete(query, {
-          projection: { _id: 0, usedpictures: 1, pictures: 1, backgroundpdf: 1 }
+          projection: {
+            _id: 0,
+            usedpictures: 1,
+            pictures: 1,
+            backgroundpdf: 1,
+            usedipynbs: 1,
+            ipynbs: 1
+          }
         })
       ).value
       const deleteprom = []
@@ -403,6 +410,18 @@ export class Housekeeping {
         tjpg = [...new Set(tjpg)]
         tpng = [...new Set(tpng)]
 
+        let ipynbset = []
+        if (deletedoc.usedipynbs)
+          ipynbset = ipynbset.concat(deletedoc.usedipynbs)
+        if (deletedoc.ipynbs) ipynbset = ipynbset.concat(deletedoc.ipynbs)
+
+        let ipynb = ipynbset.map((el) => el.sha.toString('hex'))
+
+        ipynb = [...new Set(ipynb)]
+
+        if (ipynb.length > 0)
+          deleteprom.push(this.redis.sAdd('checkdel:ipynb', ipynb))
+
         if (deletedoc.backgroundpdf) {
           const pdf = [deletedoc.backgroundpdf.sha.toString('hex')]
           deleteprom.push(this.redis.sAdd('checkdel:pdf', pdf))
@@ -430,6 +449,7 @@ export class Housekeeping {
     await this.checkAssetsforDeleteInt('jpg')
     await this.checkAssetsforDeleteInt('png')
     await this.checkAssetsforDeleteInt('pdf')
+    await this.checkAssetsforDeleteInt('ipynb')
   }
 
   async checkAssetsforDeleteInt(fileext) {
@@ -447,7 +467,9 @@ export class Housekeeping {
               { 'usedpictures.sha': Buffer.from(el, 'hex') },
               { 'pictures.sha': Buffer.from(el, 'hex') },
               { 'usedpictures.tsha': Buffer.from(el, 'hex') },
-              { 'pictures.tsha': Buffer.from(el, 'hex') }
+              { 'pictures.tsha': Buffer.from(el, 'hex') },
+              { 'usedipynbs.sha': Buffer.from(el, 'hex') },
+              { 'ipynbs.sha': Buffer.from(el, 'hex') }
             ]
           }
           const res = await lecturescol.findOne(query, {
