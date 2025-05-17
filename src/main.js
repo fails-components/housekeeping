@@ -24,6 +24,7 @@ import { writeFile, rm } from 'node:fs/promises'
 import { FailsConfig } from '@fails-components/config'
 import { FailsAssets } from '@fails-components/security'
 import { CronJob } from 'cron'
+import nodemailer from 'nodemailer'
 
 const initApp = async () => {
   const cfg = new FailsConfig()
@@ -57,6 +58,20 @@ const initApp = async () => {
   })
   const mongodb = mongoclient.db(cfg.getMongoDB())
 
+  let mailtransport
+  const rootemails = cfg.rootEmails()
+  {
+    const nodemailerConfig = cfg.nodemailerConfig()
+    if (nodemailerConfig) {
+      mailtransport = nodemailer.createTransport(nodemailerConfig)
+      if (!rootemails) {
+        throw new Error(
+          'Empty root email sender config, but SMTP sever activated'
+        )
+      }
+    }
+  }
+
   const assets = new FailsAssets({
     datadir: cfg.getDataDir(),
     dataurl: cfg.getURL('data'),
@@ -71,7 +86,10 @@ const initApp = async () => {
     redis: rediscl,
     mongo: mongodb,
     deleteAsset: assets.shadelete,
-    setupAssets: assets.setupAssets
+    setupAssets: assets.setupAssets,
+    mailtransport,
+    senderaddress: cfg.senderAddress(),
+    rootemails
   })
 
   let hklocktime = 0
@@ -102,5 +120,19 @@ const initApp = async () => {
     null,
     true
   ) // run it every minute
+
+  // eslint-disable-next-line no-unused-vars
+  const alarmjob = new CronJob(
+    '15 * * * * *',
+    () => {
+      console.log('Start checking for cloud alarm state')
+      hk.checkCloudStatus().catch((error) => {
+        console.log('check cloud status failed:', error)
+      })
+      console.log('End checking for cloud alarm state')
+    },
+    null,
+    true
+  )
 }
 initApp()

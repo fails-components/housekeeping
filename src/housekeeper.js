@@ -47,6 +47,11 @@ export class Housekeeping {
     this.setupAssets().catch((error) => {
       console.log('problem settign up assests', error)
     })
+
+    this.lastInformAVS = { localAlarm: undefined, globalAlarm: undefined }
+    this.mailtransport = args.mailtransport
+    this.senderaddress = args.senderaddress
+    this.rootemails = args.rootemails
   }
 
   async createMongoIndices() {
@@ -499,6 +504,147 @@ export class Housekeeping {
         fileext,
         error
       )
+    }
+  }
+
+  async sendStatusInfo(attn, message) {
+    console.log('Logging status info\n', attn, '\n', message)
+    if (this.mailtransport && this.rootemails) {
+      try {
+        await this.mailtransport.sendMail({
+          from: '"Fails housekeeping" <' + this.senderaddress + '>',
+          to: this.rootemails.join(','),
+          subject: attn,
+          text: message
+        })
+      } catch (err) {
+        console.log('Error while sending mail', err)
+      }
+    }
+  }
+
+  async checkCloudStatus() {
+    await this.checkAVSRouterStatus()
+  }
+
+  async checkAVSRouterStatus() {
+    try {
+      const routercol = this.mongo.collection('avsrouters')
+
+      const cursor = routercol.find(
+        {},
+        {
+          projection: {
+            _id: 0,
+            url: 1,
+            region: 1,
+            numClients: 1,
+            maxClients: 1,
+            localClients: 1,
+            remoteClients: 1,
+            primaryRealms: 1 // Realm is lecture id
+          }
+        }
+      )
+
+      const routers = []
+      while (await cursor.hasNext()) {
+        const {
+          region,
+          localClients,
+          remoteClients,
+          numClients,
+          maxClients,
+          primaryRealms,
+          url
+        } = await cursor.next()
+
+        routers.push({
+          url,
+          region,
+          numClients: numClients ?? 0,
+          maxClients: maxClients ?? 0,
+          numLocalClients: localClients?.length ?? 0,
+          numRemoteClients: remoteClients?.length ?? 0,
+          primaryLectureNum: primaryRealms?.length ?? 0
+        })
+      }
+      // now we calculate the subscription rate
+      const sumNumClients = routers.reduce(
+        (prevVal, el) => prevVal + el.numClients,
+        0
+      )
+      const sumMaxClients = routers.reduce(
+        (prevVal, el) => prevVal + el.maxClients,
+        0
+      )
+      const usedRatio = sumNumClients / sumMaxClients
+
+      const globalAlarm = usedRatio > 0.8 // make me configurable
+
+      const regions = {}
+      routers.forEach((router) => {
+        if (typeof router.region === 'undefined') return
+        if (!regions[router.region]) regions[router.region] = []
+        const region = regions[router.region]
+        region.region = router.region
+        region.numClients = (region.numClients || 0) + router.numClients
+        region.maxClients = (region.maxClients || 0) + router.maxClients
+      })
+      let localAlarm = false
+      Object.values(regions).forEach((region) => {
+        const usedRatio = region.numClients / region.maxClients
+        region.usedRatio = usedRatio
+        if (usedRatio > 0.8) localAlarm = true
+      })
+
+      if (
+        this.lastInformAVS.globalAlarm !== globalAlarm ||
+        this.lastInformAVS.localAlarm !== localAlarm
+      ) {
+        this.lastInformAVS.globalAlarm = globalAlarm
+        this.lastInformAVS.localAlarm = localAlarm
+        const statusMessage =
+          'Updated status information (AVS routers):\n' +
+          'globalAlarm: ' +
+          globalAlarm +
+          ' localAlarm:' +
+          localAlarm +
+          '\n' +
+          'Router information:\n' +
+          'URL | Region | numClients| maxClients | numLocalClients | numRemoteClients | primaryLectureNum \n' +
+          routers
+            .map(
+              (el) =>
+                el.url +
+                ' | ' +
+                el.region +
+                ' | ' +
+                el.numClients +
+                ' | ' +
+                el.maxClients +
+                ' | ' +
+                el.numLocalClients +
+                ' | ' +
+                el.numRemoteClients +
+                ' | ' +
+                el.primaryLectureNum +
+                '\n'
+            )
+            .join('') +
+          'Region information:\n' +
+          'Region | numClients| maxClients\n' +
+          Object.values(regions)
+            .map(
+              (el) =>
+                el.region + ' | ' + el.numClients + ' | ' + el.maxClients + '\n'
+            )
+            .join('') +
+          "This information is sent by FAILS's housekeeping service container\n"
+        await this.sendStatusInfo('AVS router status change', statusMessage)
+      }
+    } catch (error) {
+      console.log('Problem checking AVSRouter status:', error)
     }
   }
 }

@@ -38,10 +38,11 @@
     "dist"
   ],
   "dependencies": {
-    "@fails-components/config": "^1.2.0",
+    "@fails-components/config": "^1.7.0",
     "@fails-components/security": "^1.4.1",
     "cron": "^1.8.2",
     "mongodb": "^3.7.1",
+    "nodemailer": "^7.0.3",
     "redis": "^4.0.6",
     "redlock": "^4.2.0"
   },
